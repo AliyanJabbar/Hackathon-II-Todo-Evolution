@@ -10,7 +10,7 @@ export default function CtaBanner() {
         initial={{ opacity: 0, scale: 0.95 }}
         whileInView={{ opacity: 1, scale: 1 }}
         viewport={{ once: true }}
-        className="relative overflow-hidden rounded-3xl bg-gradient-to-r from-violet-600 to-indigo-600 px-6 py-16 text-center shadow-2xl"
+        className="relative overflow-hidden rounded-3xl bg-linear-to-r from-violet-600 to-indigo-600 px-6 py-16 text-center shadow-2xl"
       >
         <div className="relative z-10 mx-auto max-w-2xl">
           <h2 className="mb-4 text-3xl font-bold text-white sm:text-4xl">

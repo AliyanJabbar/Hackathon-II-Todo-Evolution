@@ -221,7 +221,7 @@ const Column = ({ title, headingColor, cards, column, setCards }: ColumnProps) =
         onDrop={handleDragEnd}
         onDragOver={handleDragOver}
         onDragLeave={handleDragLeave}
-        className={`h-full min-h-[150px] w-full rounded-xl transition-colors ${
+        className={`h-full min-h-37.5 w-full rounded-xl transition-colors ${
           active ? "bg-slate-800/50" : "bg-transparent"
         }`}
       >
@@ -292,7 +292,7 @@ const BurnBarrel = ({ setCards, mobile = false }: { setCards: Dispatch<SetStateA
       ${
         mobile 
         ? "h-24 w-full" 
-        : "h-32 md:h-36 xl:h-[200px] w-full xl:w-56 xl:mt-10"
+        : "h-32 md:h-36 xl:h-50 w-full xl:w-56 xl:mt-10"
       }
       `}
     >
