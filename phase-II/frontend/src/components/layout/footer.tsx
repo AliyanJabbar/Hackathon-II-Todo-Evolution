@@ -13,7 +13,7 @@ export default function Footer() {
               <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-indigo-600 shadow-lg shadow-indigo-500/20">
                 <CheckSquare size={18} className="text-white" />
               </div>
-              <span className="text-lg tracking-tight">TaskFlow</span>
+              <span className="text-lg tracking-tight">TaskGenie</span>
             </Link>
             <p className="text-sm leading-relaxed text-slate-400">
               The AI-powered task manager designed for high-performance individuals. 
@@ -91,7 +91,7 @@ export default function Footer() {
         {/* Bottom Bar */}
         <div className="mt-16 flex flex-col items-center justify-between gap-4 border-t border-slate-800 pt-8 sm:flex-row">
           <p className="text-sm text-slate-500">
-            &copy; {new Date().getFullYear()} TaskFlow Inc. All rights reserved.
+            &copy; {new Date().getFullYear()} TaskGenie Inc. All rights reserved.
           </p>
           <div className="flex items-center gap-1 text-sm text-slate-500">
             <span>Made with</span>

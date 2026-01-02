@@ -1,9 +1,8 @@
 import type { Metadata } from "next";
 import { Inter } from "next/font/google";
 import "./globals.css";
-import Navbar from "@/components/layout/navbar";
-import Footer from "@/components/layout/footer";
 import SmoothScroll from "@/components/providers/smooth-scroll";
+import AuthProvider from "@/components/providers/session-provider";
 
 const inter = Inter({ subsets: ["latin"] });
 
@@ -20,13 +19,13 @@ export default function RootLayout({
   return (
     <html lang="en">
       <body className={`${inter.className} bg-slate-950 text-slate-50 antialiased selection:bg-indigo-500/30`}>
-        <SmoothScroll>
-          <Navbar />
-          <main className="flex min-h-screen flex-col overflow-hidden">
-            {children}
-          </main>
-          <Footer />
-        </SmoothScroll>
+        <AuthProvider>
+          <SmoothScroll>
+            <main className="flex min-h-screen flex-col overflow-hidden">
+              {children}
+            </main>
+          </SmoothScroll>
+        </AuthProvider>
       </body>
     </html>
   );

@@ -1,4 +1,5 @@
 from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
 from sqlmodel import SQLModel, Field, create_engine, Session, select
 from enum import Enum
 from typing import Optional
@@ -8,6 +9,7 @@ from dotenv import load_dotenv
 load_dotenv()
 
 DATABASE_URL = os.getenv("DATABASE_URL")
+WEB_URL = os.getenv("WEB_URL", "http://localhost:3000")  # Default to localhost:3000 if not set
 
 engine = create_engine(DATABASE_URL)
 
@@ -29,6 +31,15 @@ class TodoCreate(SQLModel):
 SQLModel.metadata.create_all(bind=engine)
 
 app = FastAPI()
+
+# Add CORS middleware to allow only the specified frontend URL to make API calls
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=[WEB_URL],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 
 # Root endpoint

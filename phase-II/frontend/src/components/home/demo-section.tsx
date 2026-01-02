@@ -4,11 +4,13 @@ import React, {
   Dispatch,
   SetStateAction,
   useState,
+  useEffect,
   DragEvent,
   FormEvent,
 } from "react";
 import { Plus, Trash2, Flame, Sparkles } from "lucide-react";
 import { motion } from "framer-motion";
+import TodoAPI, { Todo } from "@/services/api";
 
 // --- Types ---
 type ColumnType = "backlog" | "todo" | "doing" | "done";
@@ -25,10 +27,14 @@ type ColumnProps = {
   cards: CardType[];
   column: ColumnType;
   setCards: Dispatch<SetStateAction<CardType[]>>;
+  onUpdateTodo: (id: string, newColumn: ColumnType) => void;
+  onCreateTodo: (title: string, column: ColumnType) => void;
+  onDeleteTodo: (id: string) => void;
 };
 
 type CardProps = CardType & {
   handleDragStart: (e: DragEvent, card: CardType) => void;
+  onDeleteTodo: (id: string) => void;
 };
 
 type DropIndicatorProps = {
@@ -39,7 +45,7 @@ type DropIndicatorProps = {
 // --- Main Component ---
 export default function DemoSection() {
   return (
-    <section id="demo" className="container mx-auto px-4 py-12">
+    <section id="demo" className="container mx-auto px-4 py-24">
       <motion.div
         initial={{ opacity: 0, y: 20 }}
         whileInView={{ opacity: 1, y: 0 }}
@@ -65,31 +71,114 @@ export default function DemoSection() {
 }
 
 const Board = () => {
-  const [cards, setCards] = useState<CardType[]>(DEFAULT_CARDS);
+  const [cards, setCards] = useState<CardType[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const fetchTodos = async () => {
+      try {
+        const todos = await TodoAPI.getTodos();
+        // Convert backend todos to frontend card format
+        const cardData = todos.map(todo => ({
+          id: todo.id.toString(),
+          title: todo.title,
+          column: todo.category
+        }));
+        setCards(cardData);
+      } catch (error) {
+        console.error("Failed to fetch todos:", error);
+        // Set default cards if API fails
+        setCards(DEFAULT_CARDS);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchTodos();
+  }, []);
+
+  const handleCreateTodo = async (title: string, column: ColumnType) => {
+    try {
+      const newTodo = await TodoAPI.createTodo({ title, category: column });
+      const newCard = {
+        id: newTodo.id.toString(),
+        title: newTodo.title,
+        column: newTodo.category
+      };
+      setCards(prev => [...prev, newCard]);
+    } catch (error) {
+      console.error("Failed to create todo:", error);
+    }
+  };
+
+  const handleUpdateTodo = async (id: string, newColumn: ColumnType) => {
+    try {
+      const todoId = parseInt(id);
+      // Find the current todo to get its title
+      const currentCard = cards.find(card => card.id === id);
+      if (!currentCard) return;
+
+      await TodoAPI.updateTodo(todoId, {
+        id: todoId,
+        title: currentCard.title,
+        category: newColumn
+      });
+
+      setCards(prev =>
+        prev.map(card =>
+          card.id === id ? { ...card, column: newColumn } : card
+        )
+      );
+    } catch (error) {
+      console.error("Failed to update todo:", error);
+    }
+  };
+
+  const handleDeleteTodo = async (id: string) => {
+    try {
+      const todoId = parseInt(id);
+      await TodoAPI.deleteTodo(todoId);
+      setCards(prev => prev.filter(card => card.id !== id));
+    } catch (error) {
+      console.error("Failed to delete todo:", error);
+    }
+  };
+
+  if (loading) {
+    return (
+      <div className="flex justify-center items-center h-64">
+        <div className="text-slate-400">Loading tasks...</div>
+      </div>
+    );
+  }
 
   return (
     <div className="w-full py-4">
       <div className="
-        w-full 
+        w-full
         // Layouts
         flex flex-col gap-6           // Mobile
         md:grid md:grid-cols-2        // Tablet
         xl:flex xl:flex-row           // Desktop
         xl:items-start                // Align columns to top
-        
+        min-h-[300px]
+
         // Scroll Logic
-        xl:overflow-x-auto 
-        [scrollbar-width:none] 
-        [-ms-overflow-style:none] 
+        xl:overflow-x-auto
+        [scrollbar-width:none]
+        [-ms-overflow-style:none]
         [&::-webkit-scrollbar]:hidden
       ">
-        
+
         <Column
           title="Backlog"
           column="backlog"
           headingColor="text-slate-400"
           cards={cards}
           setCards={setCards}
+          onUpdateTodo={handleUpdateTodo}
+          onCreateTodo={handleCreateTodo}
+          onDeleteTodo={handleDeleteTodo}
         />
         <Column
           title="Todo"
@@ -97,6 +186,9 @@ const Board = () => {
           headingColor="text-yellow-200"
           cards={cards}
           setCards={setCards}
+          onUpdateTodo={handleUpdateTodo}
+          onCreateTodo={handleCreateTodo}
+          onDeleteTodo={handleDeleteTodo}
         />
         <Column
           title="In Progress"
@@ -104,6 +196,9 @@ const Board = () => {
           headingColor="text-blue-200"
           cards={cards}
           setCards={setCards}
+          onUpdateTodo={handleUpdateTodo}
+          onCreateTodo={handleCreateTodo}
+          onDeleteTodo={handleDeleteTodo}
         />
         <Column
           title="Complete"
@@ -111,24 +206,27 @@ const Board = () => {
           headingColor="text-emerald-200"
           cards={cards}
           setCards={setCards}
+          onUpdateTodo={handleUpdateTodo}
+          onCreateTodo={handleCreateTodo}
+          onDeleteTodo={handleDeleteTodo}
         />
 
         {/* Desktop & Tablet Burn Barrel */}
         <div className="hidden md:block md:col-span-2 xl:col-auto h-auto">
-           <BurnBarrel setCards={setCards} />
+           <BurnBarrel setCards={setCards} onDeleteTodo={handleDeleteTodo} />
         </div>
 
         {/* Mobile Burn Barrel */}
-        <div className="md:hidden mt-4 pb-4">
+        <div className="hidden">
            <p className="text-center text-xs text-slate-600 mb-2 font-mono uppercase tracking-wider">Drag here to delete</p>
-           <BurnBarrel setCards={setCards} mobile />
+           <BurnBarrel setCards={setCards} onDeleteTodo={handleDeleteTodo} mobile />
         </div>
       </div>
     </div>
   );
 };
 
-const Column = ({ title, headingColor, cards, column, setCards }: ColumnProps) => {
+const Column = ({ title, headingColor, cards, column, setCards, onUpdateTodo, onCreateTodo, onDeleteTodo }: ColumnProps) => {
   const [active, setActive] = useState(false);
 
   const handleDragStart = (e: DragEvent, card: CardType) => {
@@ -148,16 +246,18 @@ const Column = ({ title, headingColor, cards, column, setCards }: ColumnProps) =
       let copy = [...cards];
       let cardToTransfer = copy.find((c) => c.id === cardId);
       if (!cardToTransfer) return;
-      cardToTransfer = { ...cardToTransfer, column };
+      // Update the column on the backend
+      onUpdateTodo(cardId, column);
 
+      // Update the local state
       copy = copy.filter((c) => c.id !== cardId);
       const moveToBack = before === "-1";
       if (moveToBack) {
-        copy.push(cardToTransfer);
+        copy.push({ ...cardToTransfer, column });
       } else {
         const insertAtIndex = copy.findIndex((el) => el.id === before);
         if (insertAtIndex === -1) return;
-        copy.splice(insertAtIndex, 0, cardToTransfer);
+        copy.splice(insertAtIndex, 0, { ...cardToTransfer, column });
       }
       setCards(copy);
     }
@@ -226,16 +326,16 @@ const Column = ({ title, headingColor, cards, column, setCards }: ColumnProps) =
         }`}
       >
         {filteredCards.map((c) => (
-          <Card key={c.id} {...c} handleDragStart={handleDragStart} />
+          <Card key={c.id} {...c} handleDragStart={handleDragStart} onDeleteTodo={onDeleteTodo} />
         ))}
         <DropIndicator beforeId={null} column={column} />
-        <AddCard column={column} setCards={setCards} />
+        <AddCard column={column} setCards={setCards} onCreateTodo={onCreateTodo} />
       </div>
     </div>
   );
 };
 
-const Card = ({ title, id, column, handleDragStart }: CardProps) => {
+const Card = ({ title, id, column, handleDragStart, onDeleteTodo }: CardProps) => {
   return (
     <>
       <DropIndicator beforeId={id} column={column} />
@@ -244,9 +344,15 @@ const Card = ({ title, id, column, handleDragStart }: CardProps) => {
         layoutId={id}
         draggable="true"
         onDragStart={(e) => handleDragStart(e as any, { title, id, column })}
-        className="cursor-grab rounded-lg border border-slate-700 bg-slate-800 p-3 active:cursor-grabbing shadow-sm hover:border-indigo-500/50 transition-colors"
+        className="relative cursor-grab rounded-lg border border-slate-700 bg-slate-800 p-3 active:cursor-grabbing shadow-sm hover:border-indigo-500/50 transition-colors"
       >
         <p className="text-sm text-slate-100">{title}</p>
+        <button
+          onClick={() => onDeleteTodo(id)}
+          className="md:hidden absolute top-2.5 right-2 p-1 text-slate-400 hover:text-red-400 transition-colors"
+        >
+          <Trash2 size={16} />
+        </button>
       </motion.div>
     </>
   );
@@ -262,7 +368,7 @@ const DropIndicator = ({ beforeId, column }: DropIndicatorProps) => {
   );
 };
 
-const BurnBarrel = ({ setCards, mobile = false }: { setCards: Dispatch<SetStateAction<CardType[]>>; mobile?: boolean; }) => {
+const BurnBarrel = ({ setCards, onDeleteTodo, mobile = false }: { setCards: Dispatch<SetStateAction<CardType[]>>; onDeleteTodo: (id: string) => void; mobile?: boolean; }) => {
   const [active, setActive] = useState(false);
 
   const handleDragOver = (e: DragEvent) => {
@@ -274,7 +380,8 @@ const BurnBarrel = ({ setCards, mobile = false }: { setCards: Dispatch<SetStateA
 
   const handleDragEnd = (e: DragEvent) => {
     const cardId = e.dataTransfer.getData("cardId");
-    setCards((pv) => pv.filter((c) => c.id !== cardId));
+    // Delete from backend
+    onDeleteTodo(cardId);
     setActive(false);
   };
 
@@ -301,19 +408,16 @@ const BurnBarrel = ({ setCards, mobile = false }: { setCards: Dispatch<SetStateA
   );
 };
 
-const AddCard = ({ column, setCards }: { column: ColumnType; setCards: Dispatch<SetStateAction<CardType[]>> }) => {
+const AddCard = ({ column, setCards, onCreateTodo }: { column: ColumnType; setCards: Dispatch<SetStateAction<CardType[]>>; onCreateTodo: (title: string, column: ColumnType) => void }) => {
   const [text, setText] = useState("");
   const [adding, setAdding] = useState(false);
 
-  const handleSubmit = (e: FormEvent<HTMLFormElement>) => {
+  const handleSubmit = async (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     if (!text.trim().length) return;
-    const newCard: CardType = {
-      column,
-      title: text.trim(),
-      id: Math.random().toString(),
-    };
-    setCards((pv) => [...pv, newCard]);
+
+    // Create todo via API
+    await onCreateTodo(text.trim(), column);
     setAdding(false);
   };
 

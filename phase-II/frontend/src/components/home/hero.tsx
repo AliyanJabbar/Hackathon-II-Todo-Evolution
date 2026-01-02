@@ -6,7 +6,7 @@ import { ArrowRight, CheckCircle2 } from "lucide-react";
 
 export default function Hero() {
   return (
-    <section className="relative flex min-h-[90vh] items-center justify-center pt-20 overflow-hidden">
+    <section className="relative flex min-h-[100dvh] items-center justify-center pt-20 overflow-hidden">
       {/* Background Ambience */}
       <div className="pointer-events-none absolute inset-0 flex justify-center">
         <div className="h-[500px] w-[500px] rounded-full bg-violet-600/20 blur-[130px] mix-blend-screen" />
@@ -53,7 +53,7 @@ export default function Hero() {
           className="mt-10 flex flex-col items-center justify-center gap-4 sm:flex-row"
         >
           <Link
-            href="#demo"
+            href="/todo"
             className="group relative flex h-12 items-center justify-center gap-2 rounded-full bg-white px-8 text-sm font-semibold text-slate-950 transition-transform hover:scale-105 active:scale-95"
           >
             Start Organizing

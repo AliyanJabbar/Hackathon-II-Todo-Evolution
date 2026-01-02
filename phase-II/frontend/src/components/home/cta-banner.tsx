@@ -17,10 +17,10 @@ export default function CtaBanner() {
             Get 1% Better Every Day
           </h2>
           <p className="mb-8 text-indigo-100">
-            Stop letting tasks slip through the cracks. Join the hackathon winners using TaskFlow.
+            Stop letting tasks slip through the cracks. Join the hackathon winners using TaskGenie.
           </p>
           <Link
-            href="#demo"
+            href="/todo"
             className="inline-block rounded-full bg-white px-8 py-3 text-sm font-bold text-indigo-600 transition-transform hover:scale-105 shadow-lg"
           >
             Try It Now
