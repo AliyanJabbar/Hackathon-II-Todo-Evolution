@@ -5,6 +5,12 @@ export interface Todo {
   category: "backlog" | "todo" | "doing" | "done";
 }
 
+export interface ChatMessage {
+  role: string;
+  text: string;
+}
+
+
 class TodoAPI {
   static getHeaders(token: string) {
     return {
@@ -13,8 +19,16 @@ class TodoAPI {
     };
   }
 
+  static async streamChat(messages: ChatMessage[], token: string): Promise<Response> {
+    return await fetch(`${BACKEND_URL}/chat/`, { // Added trailing slash to match FastAPI router
+      method: "POST",
+      headers: this.getHeaders(token),
+      body: JSON.stringify({ messages }),
+    });
+  }
+
   static async getTodos(token: string): Promise<Todo[]> {
-    const response = await fetch(`${BACKEND_URL}/todos`, {
+    const response = await fetch(`${BACKEND_URL}/todos/`, {
       headers: this.getHeaders(token),
     });
     if (!response.ok) throw new Error(`Status: ${response.status}`);
@@ -25,7 +39,7 @@ class TodoAPI {
     todo: { title: string; category: string },
     token: string
   ): Promise<Todo> {
-    const response = await fetch(`${BACKEND_URL}/todos`, {
+    const response = await fetch(`${BACKEND_URL}/todos/`, {
       method: "POST",
       headers: this.getHeaders(token),
       body: JSON.stringify(todo),

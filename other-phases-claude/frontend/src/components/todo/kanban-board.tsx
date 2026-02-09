@@ -46,7 +46,7 @@ type DropIndicatorProps = {
 };
 
 // --- Main Component ---
-export default function DemoSection() {
+export default function KanbanBoard() {
   return (
     <section id="demo" className="container mx-auto px-4 py-24">
       <motion.div

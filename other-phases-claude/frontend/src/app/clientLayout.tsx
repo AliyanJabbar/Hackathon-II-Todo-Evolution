@@ -6,6 +6,7 @@ import AuthProvider from "@/components/providers/session-provider";
 import Navbar from "@/components/layout/navbar";
 import Footer from "@/components/layout/footer";
 import { Toaster } from "sonner";
+import AIAssistantWidget from "../components/layout/AIAssistantWidget";
 
 export default function ClientLayout({
   children,
@@ -23,6 +24,7 @@ export default function ClientLayout({
     <AuthProvider>
       <SmoothScroll>
         <Navbar />
+        <AIAssistantWidget/>
         <main className="flex min-h-screen flex-col overflow-hidden">
           {children}
         </main>
