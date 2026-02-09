@@ -58,15 +58,21 @@ async def chat(request: ChatRequest, user_email: str = Depends(get_current_user)
                     - "update_todo"
                     - "delete_todo"
 
+                    IMPORTANT RULES:
+                    - Only call each tool ONCE per user request
+                    - Do NOT create duplicate todos with the same title
+                    - If a todo already exists, update it instead of creating a new one
+                    - Only create ONE todo per user request, even if the user mentions multiple tasks
+
                     When you want to perform an action, output a single JSON object like:
                     {"tool":"tool_name","args":{...}}
 
-                    Do *not* output anything else when calling a tool.  
+                    Do *not* output anything else when calling a tool.
                     Do *not* use any name other than the four valid tools above.
                     If no tool call is needed, respond with plain text — do not attempt a tool call.
                     We have 4 categories: backlog, todo, doing and done
                     """,
-                    mcp_servers=[server], 
+                    mcp_servers=[server],
                     model_settings=ModelSettings(tool_choice="auto")
                 )
                 print("⚙️ Running agent...")

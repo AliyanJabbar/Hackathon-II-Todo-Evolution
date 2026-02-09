@@ -2,7 +2,9 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlmodel import Session, select
 from typing import List
 from models import Todo, TodoCreate, engine
-from auth import get_current_user 
+from auth import get_current_user
+from websocket_manager import manager
+import json
 
 router = APIRouter(
     prefix="/todos",
@@ -18,7 +20,7 @@ def get_todos(user_email: str = Depends(get_current_user)):
         ).all()
 
 @router.post("/", response_model=Todo)
-def create_todo(todo: TodoCreate, user_email: str = Depends(get_current_user)):
+async def create_todo(todo: TodoCreate, user_email: str = Depends(get_current_user)):
     with Session(engine) as session:
         db_todo = Todo(
             title=todo.title,
@@ -28,10 +30,23 @@ def create_todo(todo: TodoCreate, user_email: str = Depends(get_current_user)):
         session.add(db_todo)
         session.commit()
         session.refresh(db_todo)
+
+        # Broadcast the new todo to connected clients
+        message = json.dumps({
+            "action": "create",
+            "todo": {
+                "id": db_todo.id,
+                "title": db_todo.title,
+                "category": db_todo.category,
+                "user_id": db_todo.user_id
+            }
+        })
+        await manager.broadcast(message, user_email)
+
         return db_todo
 
 @router.put("/{id}", response_model=Todo)
-def update_todo(id: int, update_todo: Todo, user_email: str = Depends(get_current_user)):
+async def update_todo(id: int, update_todo: Todo, user_email: str = Depends(get_current_user)):
     with Session(engine) as session:
         db_todo = session.exec(
             select(Todo).where(Todo.id == id, Todo.user_id == user_email)
@@ -42,6 +57,19 @@ def update_todo(id: int, update_todo: Todo, user_email: str = Depends(get_curren
         db_todo.category = update_todo.category
         session.commit()
         session.refresh(db_todo)
+
+        # Broadcast the updated todo to connected clients
+        message = json.dumps({
+            "action": "update",
+            "todo": {
+                "id": db_todo.id,
+                "title": db_todo.title,
+                "category": db_todo.category,
+                "user_id": db_todo.user_id
+            }
+        })
+        await manager.broadcast(message, user_email)
+
         return db_todo
 
 @router.delete("/{id}")
