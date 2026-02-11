@@ -9,6 +9,7 @@ from agents.mcp import MCPServerStreamableHttp, MCPToolMetaContext
 import os, json
 from llm_config import groq_config
 from agents import ModelSettings
+from dotenv import load_dotenv
 
 router = APIRouter(prefix="/chat", tags=["Chatbot"])
 
@@ -22,6 +23,9 @@ class ChatRequest(BaseModel):
 class AgentContext(BaseModel):
     user_email: str
 
+load_dotenv()
+mcp_url = os.getenv("MCP_URL")
+print("mcp_url: ", mcp_url)
 # resolver: produce MCP "_meta"
 def resolve_meta(wrapper: MCPToolMetaContext) -> dict[str, str] | None:
     # The run_context.context is your AgentContext Pydantic model,
@@ -42,7 +46,7 @@ async def chat(request: ChatRequest, user_email: str = Depends(get_current_user)
             # HTTP Streamable MCP
             async with MCPServerStreamableHttp(
                 name="Todo MCP HTTP",
-                params={"url": "http://127.0.0.1:8001/mcp"},
+                params={"url": f"{mcp_url}/mcp"},
                 tool_meta_resolver=resolve_meta,
             ) as server:
 
