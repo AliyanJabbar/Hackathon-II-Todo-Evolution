@@ -34,6 +34,29 @@ export default function Navbar() {
     { name: "Start Managing", href: "/todo" },
   ];
 
+  // 👇 Smooth scroll handler (Windows-friendly)
+const handleSmoothScroll = (
+  e: React.MouseEvent<HTMLAnchorElement>,
+  href: string
+) => {
+  if (!href.startsWith("/#")) return;
+
+  // 👇 only smooth-scroll if we're already on home page
+  if (window.location.pathname !== "/") return;
+
+  e.preventDefault();
+
+  const id = href.replace("/#", "");
+  const el = document.getElementById(id);
+
+  if (el) {
+    const y =
+      el.getBoundingClientRect().top + window.pageYOffset - 64;
+    window.scrollTo({ top: y, behavior: "smooth" });
+  }
+};
+
+
   return (
     <>
       <motion.header
@@ -65,6 +88,7 @@ export default function Navbar() {
               <Link
                 key={link.name}
                 href={link.href}
+                onClick={(e) => handleSmoothScroll(e, link.href)}
                 className="hover:text-violet-400 transition-colors relative group"
               >
                 {link.name}
@@ -164,32 +188,16 @@ export default function Navbar() {
                 <Link
                   key={link.name}
                   href={link.href}
-                  onClick={() => setIsMobileMenuOpen(false)}
+                  onClick={(e) => {
+                    handleSmoothScroll(e, link.href);
+                    setIsMobileMenuOpen(false);
+                  }}
                   className="flex items-center justify-between rounded-lg bg-white/5 px-4 py-3 text-sm font-medium text-slate-200 hover:bg-violet-500/10 hover:text-violet-400"
                 >
                   {link.name}
                   <ChevronRight size={16} className="text-violet-500" />
                 </Link>
               ))}
-
-              {!session && (
-                <div className="mt-4 flex flex-col gap-3 border-t border-violet-500/10 pt-4">
-                  <Link
-                    href="/login"
-                    onClick={() => setIsMobileMenuOpen(false)}
-                    className="flex h-11 items-center justify-center rounded-lg border border-violet-500/20 text-sm font-medium text-white"
-                  >
-                    Log in
-                  </Link>
-                  <Link
-                    href="/register"
-                    onClick={() => setIsMobileMenuOpen(false)}
-                    className="flex h-11 items-center justify-center rounded-lg bg-violet-600 text-sm font-bold text-white shadow-[0_0_15px_rgba(139,92,246,0.3)]"
-                  >
-                    Register For Free
-                  </Link>
-                </div>
-              )}
             </nav>
           </motion.div>
         )}

@@ -5,6 +5,7 @@ import {
   SetStateAction,
   useState,
   useEffect,
+  useRef,
   DragEvent,
   FormEvent,
 } from "react";
@@ -22,6 +23,7 @@ type CardType = {
   title: string;
   id: string;
   column: ColumnType;
+  stableId: string;
 };
 
 type ColumnProps = {
@@ -46,7 +48,7 @@ type DropIndicatorProps = {
 };
 
 // --- Main Component ---
-export default function DemoSection() {
+export default function KanbanBoard() {
   return (
     <section id="demo" className="container mx-auto px-4 py-24">
       <motion.div
@@ -78,6 +80,8 @@ const Board = () => {
   const token = (session as any)?.accessToken; // Access our custom token
   const [cards, setCards] = useState<CardType[]>([]);
   const [loading, setLoading] = useState(true);
+  const wsRef = useRef<WebSocket | null>(null);
+  const tempIdCounter = useRef(0);
 
   useEffect(() => {
     const fetchTodos = async () => {
@@ -90,7 +94,8 @@ const Board = () => {
         const cardData = todos.map(todo => ({
           id: todo.id.toString(),
           title: todo.title,
-          column: todo.category as ColumnType
+          column: todo.category as ColumnType,
+          stableId: todo.id.toString()
         }));
         setCards(cardData);
       } catch (error) {
@@ -103,24 +108,114 @@ const Board = () => {
     fetchTodos();
   }, [status, token]);
 
+  // WebSocket connection for real-time updates
+  useEffect(() => {
+    if (status !== "authenticated" || !token) return;
+
+    const wsUrl = `ws://localhost:8000/ws/todos?token=${encodeURIComponent(token)}`;
+    const ws = new WebSocket(wsUrl);
+    wsRef.current = ws;
+
+    ws.onopen = () => {
+      console.log("WebSocket connected");
+    };
+
+    ws.onmessage = (event) => {
+      console.log("WebSocket message received:", event.data);
+      try {
+        const data = JSON.parse(event.data);
+        console.log("Parsed WebSocket data:", data);
+        if (data.action === "create") {
+          console.log("Processing create action");
+          const realCard = {
+            id: data.todo.id.toString(),
+            title: data.todo.title,
+            column: data.todo.category as ColumnType,
+            stableId: data.todo.id.toString()
+          };
+          setCards(prev => {
+            // Check if real card already exists (from manual creation)
+            if (prev.some(card => card.id === realCard.id)) {
+              console.log("Real card already exists, skipping WebSocket create");
+              return prev;
+            }
+
+            // Check if there's a temp card that matches this todo
+            const tempCardIndex = prev.findIndex(card =>
+              card.id.startsWith('temp-') &&
+              card.title === realCard.title &&
+              card.column === realCard.column
+            );
+
+            if (tempCardIndex !== -1) {
+              // Replace the temp card with the real card
+              console.log("Replacing temp card with real card from WebSocket");
+              const updated = [...prev];
+              updated[tempCardIndex] = realCard;
+              return updated;
+            }
+
+            // No temp card found, add the real card
+            console.log("Adding real card from WebSocket");
+            return [...prev, realCard];
+          });
+        } else if (data.action === "update") {
+          console.log("Processing update action");
+          setCards(prev => prev.map(card =>
+            card.id === data.todo.id.toString()
+              ? { ...card, title: data.todo.title, column: data.todo.category as ColumnType }
+              : card
+          ));
+        } else if (data.action === "delete") {
+          console.log("Processing delete action");
+          setCards(prev => prev.filter(card => card.id !== data.todo.id.toString()));
+        }
+      } catch (error) {
+        console.error("Error parsing WebSocket message:", error);
+      }
+    };
+
+    ws.onclose = () => {
+      console.log("WebSocket disconnected");
+    };
+
+    ws.onerror = (error) => {
+      console.error("WebSocket error:", error);
+    };
+
+    return () => {
+      ws.close();
+    };
+  }, [status, token]);
+
   const handleCreateTodo = async (title: string, column: ColumnType) => {
     if (!token) return;
 
     // Generate temporary ID for optimistic update
-    const tempId = `temp-${Date.now()}-${Math.random()}`;
-    const optimisticCard = { id: tempId, title, column };
+    tempIdCounter.current += 1;
+    const tempId = `temp-${tempIdCounter.current}`;
+    const optimisticCard: CardType = { id: tempId, title, column, stableId: tempId };
 
     // Optimistically add to UI immediately
     setCards(prev => [...prev, optimisticCard]);
 
     try {
       const newTodo = await TodoAPI.createTodo({ title, category: column }, token);
-      // Replace temporary card with real data
-      setCards(prev => prev.map(card =>
-        card.id === tempId
-          ? { id: newTodo.id.toString(), title: newTodo.title, column: newTodo.category }
-          : card
-      ));
+      // Update the temporary card with real data, or remove temp if real card already exists
+      setCards(prev => {
+        const realId = newTodo.id.toString();
+        // If real card already exists (from WebSocket), just remove temp card
+        if (prev.some(card => card.id === realId)) {
+          return prev.filter(card => card.id !== tempId);
+        } else {
+          // Update temp card to real card
+          return prev.map(card =>
+            card.id === tempId
+              ? { id: realId, title: newTodo.title, column: newTodo.category, stableId: realId }
+              : card
+          );
+        }
+      });
     } catch (error) {
       console.error(error);
       // Rollback: remove the optimistic card on failure
@@ -252,7 +347,7 @@ const Column = ({ title, headingColor, cards, column, setCards, onUpdateTodo, on
 
     if (before !== cardId) {
       let copy = [...cards];
-      let cardToTransfer = copy.find((c) => c.id === cardId);
+      const cardToTransfer = copy.find((c) => c.id === cardId);
       if (!cardToTransfer) return;
       // Update the column on the backend
       onUpdateTodo(cardId, column);
@@ -334,7 +429,7 @@ const Column = ({ title, headingColor, cards, column, setCards, onUpdateTodo, on
         }`}
       >
         {filteredCards.map((c) => (
-          <Card key={c.id} {...c} handleDragStart={handleDragStart} onDeleteTodo={onDeleteTodo} />
+          <Card key={c.stableId} {...c} handleDragStart={handleDragStart} onDeleteTodo={onDeleteTodo} />
         ))}
         <DropIndicator beforeId={null} column={column} />
         <AddCard key={column} column={column} setCards={setCards} onCreateTodo={onCreateTodo} />
@@ -343,15 +438,15 @@ const Column = ({ title, headingColor, cards, column, setCards, onUpdateTodo, on
   );
 };
 
-const Card = ({ title, id, column, handleDragStart, onDeleteTodo }: CardProps) => {
+const Card = ({ title, id, column, stableId, handleDragStart, onDeleteTodo }: CardProps) => {
   return (
     <>
       <DropIndicator beforeId={id} column={column} />
       <motion.div
         layout
-        layoutId={id}
+        layoutId={stableId}
         draggable="true"
-        onDragStart={(e) => handleDragStart(e as any, { title, id, column })}
+        onDragStart={(e) => handleDragStart(e as any, { title, id, column, stableId })}
         className="relative cursor-grab rounded-lg border border-slate-700 bg-slate-800 p-3 active:cursor-grabbing shadow-sm hover:border-indigo-500/50 transition-colors"
       >
         <p className="text-sm text-slate-100">{title}</p>
@@ -478,12 +573,3 @@ const AddCard = ({ column, setCards, onCreateTodo }: { column: ColumnType; setCa
     </>
   );
 };
-
-const DEFAULT_CARDS: CardType[] = [
-  { title: "Research AI Model integration", id: "1", column: "backlog" },
-  { title: "Design Logo & Brand assets", id: "2", column: "backlog" },
-  { title: "Initialize Next.js repo", id: "5", column: "todo" },
-  { title: "Install Motion & Tailwind", id: "6", column: "todo" },
-  { title: "Building Homepage", id: "8", column: "doing" },
-  { title: "Read Hackathon Rules", id: "10", column: "done" },
-];
