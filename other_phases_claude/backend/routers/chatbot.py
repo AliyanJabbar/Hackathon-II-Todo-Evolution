@@ -92,6 +92,8 @@ async def chat(request: ChatRequest, user_email: str = Depends(get_current_user)
                         event.data, ResponseTextDeltaEvent
                     ):
                         yield f"{json.dumps({'chunk': event.data.delta})}\n\n"
+                        # print({"chunk": chunk_data})
+                print("final response: ", result.final_output)
 
         except Exception as e:
             print("❌ Error:", str(e))
