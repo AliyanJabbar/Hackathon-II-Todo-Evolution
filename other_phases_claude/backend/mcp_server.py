@@ -1,5 +1,5 @@
 # mcp_server.py
-from mcp.server.fastmcp import FastMCP, Context
+from fastmcp import FastMCP, Context
 from sqlmodel import Session, select
 from models import Todo, engine
 import httpx
@@ -181,5 +181,10 @@ async def delete_todo(id: int, ctx: Context):
 
 # This exposes the MCP server as a Streamable HTTP app
 # You can then run it with uvicorn:
-mcp_app = mcp.streamable_http_app()
+
+# mcp_app = mcp.streamable_http_app() #when built with core mcp we need to expose an ASGI app, but in fastmcp we don't
 # development command: uvicorn mcp_server:mcp_app --reload --port 8001
+
+
+# if __name__ == "__main__":
+#     mcp.run(transport="http", port=8001)
