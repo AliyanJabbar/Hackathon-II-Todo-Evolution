@@ -40,44 +40,45 @@ def authenticate_websocket_token(token: str) -> str:
         user_email = payload.get("email")
         if not user_email:
             raise HTTPException(status_code=401, detail="Invalid token")
-        return user_email
+        # NORMALIZE EMAIL TO LOWERCASE
+        return user_email.lower()
     except Exception:
         raise HTTPException(status_code=401, detail="Token verification failed")
 
 @app.websocket("/ws/todos")
 async def websocket_endpoint(websocket: WebSocket, token: str = Query(...)):
+    # usage: ws://localhost:8000/ws/todos?token=...
     user_email = authenticate_websocket_token(token)
     await manager.connect(websocket, user_email)
     try:
         while True:
-            data = await websocket.receive_text()
-            # Keep connection alive, no need to process incoming messages
+            # Keep connection alive
+            await websocket.receive_text()
     except Exception:
         manager.disconnect(websocket, user_email)
 
 @app.post("/broadcast")
 async def broadcast_message(data: dict):
     """Endpoint for MCP server to broadcast WebSocket messages"""
-    print(f"Received broadcast request: {data}")
-
-    user_email = data.get("user_email")
+    raw_email = data.get("user_email")
     action = data.get("action")
     todo = data.get("todo")
 
-    if not user_email or not action or not todo:
-        print(f"Missing fields: user_email={user_email}, action={action}, todo={todo}")
-        raise HTTPException(status_code=400, detail="Missing required fields: user_email, action, todo")
+    if not raw_email or not action or not todo:
+        raise HTTPException(status_code=400, detail="Missing required fields")
 
-    print(f"Broadcasting {action} for user {user_email}: {todo}")
-    print(f"Active connections: {list(manager.active_connections.keys())}")
-    print(f"Connections for {user_email}: {len(manager.active_connections.get(user_email, []))}")
+    # NORMALIZE EMAIL TO LOWERCASE
+    user_email = raw_email.lower()
 
+    print(f"Broadcasting {action} to {user_email}")
+    
+    # Construct message as string for WebSocket
     message = json.dumps({
         "action": action,
         "todo": todo
     })
+    
     await manager.broadcast(message, user_email)
-    print(f"Broadcasted message to {user_email}")
     return {"status": "broadcasted"}
 
 @app.get("/")

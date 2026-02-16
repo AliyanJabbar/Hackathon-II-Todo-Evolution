@@ -1,19 +1,16 @@
-# mcp_server.py
 from fastmcp import FastMCP, Context
 from sqlmodel import select
-from models import Todo, engine, Session  # Use your models.py engine
+from models import Todo, engine, Session  
 import httpx
 import os
 
-# Environment variables (set these in FastMCP Cloud dashboard)
+# Environment variables
 BACKEND_URL = os.getenv("BACKEND_URL", "http://localhost:8000")
 
-# Initialize MCP
 mcp = FastMCP("Todo MCP Server")
 
-
 # -------------------------
-# Helper: Get user email safely
+# Helper: Get user email safely & Normalize
 # -------------------------
 async def get_email(ctx: Context) -> str:
     if not ctx.request_context or not ctx.request_context.meta:
@@ -22,9 +19,9 @@ async def get_email(ctx: Context) -> str:
     meta = ctx.request_context.meta
     if not hasattr(meta, "user_email"):
         raise Exception("Unauthorized: user_email missing in metadata")
-
-    return meta.user_email
-
+    
+    # Normalize email to lowercase to ensure it matches the WebSocket connection
+    return meta.user_email.lower()
 
 # -------------------------
 # Tools
@@ -39,12 +36,12 @@ async def get_todos(ctx: Context):
         ).all()
         return [todo.model_dump() for todo in todos]
 
-
 @mcp.tool()
 async def create_todo(title: str, category: str = "backlog", ctx: Context = None):
     user_email = await get_email(ctx)
 
     with Session(engine) as session:
+        # Check for duplicates to avoid clutter
         existing_todo = session.exec(
             select(Todo).where(Todo.user_id == user_email, Todo.title == title)
         ).first()
@@ -56,24 +53,30 @@ async def create_todo(title: str, category: str = "backlog", ctx: Context = None
         session.commit()
         session.refresh(db_todo)
 
-        # Safe broadcast
-        if BACKEND_URL and not BACKEND_URL.startswith("http://localhost"):
-            try:
-                async with httpx.AsyncClient() as client:
-                    await client.post(
-                        f"{BACKEND_URL}/broadcast",
-                        json={
-                            "user_email": user_email,
-                            "action": "create",
-                            "todo": db_todo.model_dump()
-                        },
-                        timeout=5
-                    )
-            except Exception:
-                pass
+        # Prepare a clean dictionary for broadcast (avoids datetime serialization errors)
+        broadcast_payload = {
+            "user_email": user_email,
+            "action": "create",
+            "todo": {
+                "id": db_todo.id,
+                "title": db_todo.title,
+                "category": db_todo.category,
+                "user_id": db_todo.user_id
+            }
+        }
+
+        # Broadcast the new todo to connected clients
+        try:
+            async with httpx.AsyncClient() as client:
+                await client.post(
+                    f"{BACKEND_URL}/broadcast",
+                    json=broadcast_payload,
+                    timeout=5
+                )
+        except Exception as e:
+            print(f"Failed to broadcast create: {e}")
 
         return db_todo.model_dump()
-
 
 @mcp.tool()
 async def update_todo(id: int, title: str, category: str, ctx: Context):
@@ -91,24 +94,29 @@ async def update_todo(id: int, title: str, category: str, ctx: Context):
         session.commit()
         session.refresh(db_todo)
 
-        # Safe broadcast
-        if BACKEND_URL and not BACKEND_URL.startswith("http://localhost"):
-            try:
-                async with httpx.AsyncClient() as client:
-                    await client.post(
-                        f"{BACKEND_URL}/broadcast",
-                        json={
-                            "user_email": user_email,
-                            "action": "update",
-                            "todo": db_todo.model_dump()
-                        },
-                        timeout=5
-                    )
-            except Exception:
-                pass
+        # Clean payload
+        broadcast_payload = {
+            "user_email": user_email,
+            "action": "update",
+            "todo": {
+                "id": db_todo.id,
+                "title": db_todo.title,
+                "category": db_todo.category,
+                "user_id": db_todo.user_id
+            }
+        }
+
+        try:
+            async with httpx.AsyncClient() as client:
+                await client.post(
+                    f"{BACKEND_URL}/broadcast",
+                    json=broadcast_payload,
+                    timeout=5
+                )
+        except Exception as e:
+            print(f"Failed to broadcast update: {e}")
 
         return db_todo.model_dump()
-
 
 @mcp.tool()
 async def delete_todo(id: int, ctx: Context):
@@ -121,25 +129,29 @@ async def delete_todo(id: int, ctx: Context):
         if not db_todo:
             return {"error": "Todo not found"}
 
-        deleted_todo = db_todo.model_dump()
+        # Capture ID before deletion for the broadcast
+        deleted_id = db_todo.id
         session.delete(db_todo)
         session.commit()
 
-        # Safe broadcast
-        if BACKEND_URL and not BACKEND_URL.startswith("http://localhost"):
-            try:
-                async with httpx.AsyncClient() as client:
-                    await client.post(
-                        f"{BACKEND_URL}/broadcast",
-                        json={
-                            "user_email": user_email,
-                            "action": "delete",
-                            "todo": deleted_todo
-                        },
-                        timeout=5
-                    )
-            except Exception:
-                pass
+        # Clean payload
+        broadcast_payload = {
+            "user_email": user_email,
+            "action": "delete",
+            "todo": {
+                "id": deleted_id
+            }
+        }
+
+        try:
+            async with httpx.AsyncClient() as client:
+                await client.post(
+                    f"{BACKEND_URL}/broadcast",
+                    json=broadcast_payload,
+                    timeout=5
+                )
+        except Exception as e:
+            print(f"Failed to broadcast delete: {e}")
 
         return {"message": "Todo deleted"}
 
@@ -149,6 +161,5 @@ async def delete_todo(id: int, ctx: Context):
 # mcp_app = mcp.streamable_http_app() #when built with core mcp we need to expose an ASGI app, but in fastmcp we don't
 # development command: uvicorn mcp_server:mcp_app --reload --port 8001
 
-
-# if __name__ == "__main__":
-#     mcp.run(transport="http", port=8001)
+if __name__ == "__main__":
+    mcp.run(transport="http", port=8001)

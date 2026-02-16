@@ -73,13 +73,23 @@ async def update_todo(id: int, update_todo: Todo, user_email: str = Depends(get_
         return db_todo
 
 @router.delete("/{id}")
-def delete_todo(id: int, user_email: str = Depends(get_current_user)):
+async def delete_todo(id: int, user_email: str = Depends(get_current_user)):
     with Session(engine) as session:
         db_todo = session.exec(
             select(Todo).where(Todo.id == id, Todo.user_id == user_email)
         ).first()
         if not db_todo:
             raise HTTPException(status_code=404, detail="Todo not found")
+        
+        deleted_todo = db_todo.model_dump()
         session.delete(db_todo)
         session.commit()
+
+        # Broadcast the deleted todo to connected clients
+        message = json.dumps({
+            "action": "delete",
+            "todo": deleted_todo
+        })
+        await manager.broadcast(message, user_email)
+
         return {"message": "Todo deleted"}

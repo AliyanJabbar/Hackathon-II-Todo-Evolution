@@ -108,7 +108,7 @@ const Board = () => {
     fetchTodos();
   }, [status, token]);
 
-  // WebSocket connection for real-time updates
+// WebSocket connection for real-time updates
   useEffect(() => {
     if (status !== "authenticated" || !token) return;
 
@@ -121,26 +121,22 @@ const Board = () => {
     };
 
     ws.onmessage = (event) => {
-      console.log("WebSocket message received:", event.data);
       try {
         const data = JSON.parse(event.data);
-        console.log("Parsed WebSocket data:", data);
+        
         if (data.action === "create") {
-          console.log("Processing create action");
           const realCard = {
             id: data.todo.id.toString(),
             title: data.todo.title,
             column: data.todo.category as ColumnType,
             stableId: data.todo.id.toString()
           };
+          
           setCards(prev => {
-            // Check if real card already exists (from manual creation)
-            if (prev.some(card => card.id === realCard.id)) {
-              console.log("Real card already exists, skipping WebSocket create");
-              return prev;
-            }
+            // 1. If real card exists, ignore
+            if (prev.some(card => card.id === realCard.id)) return prev;
 
-            // Check if there's a temp card that matches this todo
+            // 2. Check for matching temp card (by title/column)
             const tempCardIndex = prev.findIndex(card =>
               card.id.startsWith('temp-') &&
               card.title === realCard.title &&
@@ -148,26 +144,24 @@ const Board = () => {
             );
 
             if (tempCardIndex !== -1) {
-              // Replace the temp card with the real card
-              console.log("Replacing temp card with real card from WebSocket");
               const updated = [...prev];
               updated[tempCardIndex] = realCard;
               return updated;
             }
 
-            // No temp card found, add the real card
-            console.log("Adding real card from WebSocket");
+            // 3. New external addition
             return [...prev, realCard];
           });
+
         } else if (data.action === "update") {
-          console.log("Processing update action");
           setCards(prev => prev.map(card =>
+            // Ensure ID comparison is string-to-string
             card.id === data.todo.id.toString()
               ? { ...card, title: data.todo.title, column: data.todo.category as ColumnType }
               : card
           ));
+
         } else if (data.action === "delete") {
-          console.log("Processing delete action");
           setCards(prev => prev.filter(card => card.id !== data.todo.id.toString()));
         }
       } catch (error) {
@@ -175,14 +169,8 @@ const Board = () => {
       }
     };
 
-    ws.onclose = () => {
-      console.log("WebSocket disconnected");
-    };
-
-    ws.onerror = (error) => {
-      console.error("WebSocket error:", error);
-    };
-
+    ws.onclose = () => console.log("WebSocket disconnected");
+    
     return () => {
       ws.close();
     };
