@@ -108,11 +108,12 @@ const Board = () => {
     fetchTodos();
   }, [status, token]);
 
-// WebSocket connection for real-time updates
+  // WebSocket connection for real-time updates
   useEffect(() => {
     if (status !== "authenticated" || !token) return;
 
-    const wsUrl = `ws://localhost:8000/ws/todos?token=${encodeURIComponent(token)}`;
+    const BACKEND_WS_URL = process.env.NEXT_PUBLIC_BACKEND_URL?.replace(/^http/, "ws");
+    const wsUrl = `${BACKEND_WS_URL}/ws/todos?token=${encodeURIComponent(token)}`;
     const ws = new WebSocket(wsUrl);
     wsRef.current = ws;
 
@@ -123,7 +124,7 @@ const Board = () => {
     ws.onmessage = (event) => {
       try {
         const data = JSON.parse(event.data);
-        
+
         if (data.action === "create") {
           const realCard = {
             id: data.todo.id.toString(),
@@ -131,7 +132,7 @@ const Board = () => {
             column: data.todo.category as ColumnType,
             stableId: data.todo.id.toString()
           };
-          
+
           setCards(prev => {
             // 1. If real card exists, ignore
             if (prev.some(card => card.id === realCard.id)) return prev;
@@ -170,7 +171,7 @@ const Board = () => {
     };
 
     ws.onclose = () => console.log("WebSocket disconnected");
-    
+
     return () => {
       ws.close();
     };
@@ -260,7 +261,7 @@ const Board = () => {
   if (status === "loading" || loading) return <BoardSkeleton />;
   return (
     <div className="w-full py-4">
-<div className="w-full flex flex-col gap-6 md:grid md:grid-cols-2 xl:flex xl:flex-row xl:items-start min-h-75 xl:overflow-x-auto [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden">
+      <div className="w-full flex flex-col gap-6 md:grid md:grid-cols-2 xl:flex xl:flex-row xl:items-start min-h-75 xl:overflow-x-auto [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden">
         <Column
           title="Backlog"
           column="backlog"
@@ -304,13 +305,13 @@ const Board = () => {
 
         {/* Desktop & Tablet Burn Barrel */}
         <div className="hidden md:block md:col-span-2 xl:col-auto h-auto">
-           <BurnBarrel setCards={setCards} onDeleteTodo={handleDeleteTodo} />
+          <BurnBarrel setCards={setCards} onDeleteTodo={handleDeleteTodo} />
         </div>
 
         {/* Mobile Burn Barrel */}
         <div className="hidden">
-           <p className="text-center text-xs text-slate-600 mb-2 font-mono uppercase tracking-wider">Drag here to delete</p>
-           <BurnBarrel setCards={setCards} onDeleteTodo={handleDeleteTodo} mobile />
+          <p className="text-center text-xs text-slate-600 mb-2 font-mono uppercase tracking-wider">Drag here to delete</p>
+          <BurnBarrel setCards={setCards} onDeleteTodo={handleDeleteTodo} mobile />
         </div>
       </div>
     </div>
@@ -412,9 +413,8 @@ const Column = ({ title, headingColor, cards, column, setCards, onUpdateTodo, on
         onDrop={handleDragEnd}
         onDragOver={handleDragOver}
         onDragLeave={handleDragLeave}
-        className={`h-full min-h-37.5 w-full rounded-xl transition-colors ${
-          active ? "bg-slate-800/50" : "bg-transparent"
-        }`}
+        className={`h-full min-h-37.5 w-full rounded-xl transition-colors ${active ? "bg-slate-800/50" : "bg-transparent"
+          }`}
       >
         {filteredCards.map((c) => (
           <Card key={c.stableId} {...c} handleDragStart={handleDragStart} onDeleteTodo={onDeleteTodo} />
@@ -482,16 +482,14 @@ const BurnBarrel = ({ setCards, onDeleteTodo, mobile = false }: { setCards: Disp
       onDragOver={handleDragOver}
       onDragLeave={handleDragLeave}
       className={`grid place-content-center rounded-xl border-2 border-dashed transition-all shrink-0 
-      ${
-        active
+      ${active
           ? "border-red-500 bg-red-500/10 text-red-500 scale-105"
           : "border-slate-800 bg-slate-900/20 text-slate-600 hover:border-slate-700 hover:text-slate-500"
-      }
-      ${
-        mobile 
-        ? "h-24 w-full" 
-        : "h-32 md:h-36 xl:h-50 w-full xl:w-56 xl:mt-10"
-      }
+        }
+      ${mobile
+          ? "h-24 w-full"
+          : "h-32 md:h-36 xl:h-50 w-full xl:w-56 xl:mt-10"
+        }
       `}
     >
       {active ? <Flame className="animate-bounce" size={mobile ? 24 : 32} /> : <Trash2 size={mobile ? 20 : 24} />}
@@ -561,3 +559,4 @@ const AddCard = ({ column, setCards, onCreateTodo }: { column: ColumnType; setCa
     </>
   );
 };
+
